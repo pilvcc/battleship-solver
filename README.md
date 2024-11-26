@@ -31,13 +31,15 @@ This is more an assistant than a solver. It's possible (and not that hard) to
 write a full solver, but the goal of this tool instead is to change the
 character of the game.
 
-The game has easy and hard puzzles. Easy puzzles can essentially be autosolved
-by repeatedly applying a few rules:
+The game has easy and hard puzzles. Easy puzzles can be autosolved by repeatedly
+applying a few rules:
 
 - If a line has used up its ship squares, the rest must be water
 - If a line has used up its non-ship squares, the rest must be ship
 - If there's a ship square, its corners must be water
 - If there's a completed ship, its perimeter must be water
+- If there's only one place a ship can go, it has to go there (e.g. if you have
+  a 5-ship, and there's only one remaining 5-slot)
 
 For hard puzzles, applying the rules isn't enough. You end up getting stuck.
 Then you have to play the "macro" game of enumerating the possible ship
@@ -52,10 +54,3 @@ the macro.
 In a way I was inspired by Braid, a platformer that lets you rewind time instead
 of dying, so that the game becomes about the higher-level puzzle rather than
 mechanically trying not to fall or get killed.
-
-## Future work
-
-There's actually a fifth rule: if there's only one remaining place a ship can
-go, it has to go there. E.g. if your 5-square ship hasn't been played, and
-there's only one row that even allows 5 ships. (Backtracking is when there are
-multiple places ships can go.)

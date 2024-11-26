@@ -1,3 +1,5 @@
+import { counting } from "radash";
+
 (() => {
   const byId = (id: string) => document.getElementById(id);
 
@@ -28,7 +30,8 @@
     | "cap-right"
     | "cap-top"
     | "cap-bottom"
-    | "middle";
+    | "middle"
+    | "unknown";
 
   const getSquareClasses = (el: Element) =>
     new Set(Array.from(el.classList)) as Set<SquareClass>;
@@ -105,10 +108,10 @@
       if (classes.has("cap-bottom")) mark(x, y - 1);
 
       // handle ship middles
-      // if one way is blocked (by water, by max ship count), fill in the ship the other way
+      // if one way is blocked (by water, edge, max ship count), fill in the ship the other way
       if (classes.has("middle")) {
         const isBlocked = (x: number, y: number) =>
-          ["ship", "invalid"].includes(getSquareType(getSquare(x, y)));
+          ["water", "invalid"].includes(getSquareType(getSquare(x, y)));
 
         const areSidesBlocked = (isRow: boolean) => {
           if (isRow) {
@@ -160,7 +163,7 @@
       ];
 
       for (const [x2, y2] of waters) {
-        if (skip[0] === x2 && skip[1] !== y2) continue;
+        if (skip[0] === x2 && skip[1] === y2) continue;
         mark(x2, y2);
       }
     }
@@ -191,6 +194,104 @@
             if (type === "blank") {
               markShip(getRealSquare(x, y));
             }
+          }
+        }
+      }
+    }
+
+    // try to place ships where they belong
+    const ships = Array.from(document.querySelectorAll(".ship-list span"));
+    const remainingShips = ships
+      .filter((it) => !it.querySelector("i")?.classList.contains("found"))
+      .map((it) => {
+        const sizes = {
+          Superyacht: 5,
+          "Exxon Valdez": 4,
+          "Garbage barge": 3,
+          "Nigerian pirate": 2,
+          "Doughnut floatie": 1,
+        };
+        const title = it.getAttribute("title") as keyof typeof sizes;
+        return sizes[title];
+      });
+
+    const remainingShipCounts = counting(remainingShips, (it) => it);
+    for (const [_shipSize, count] of Object.entries(remainingShipCounts)) {
+      const shipSize = parseInt(_shipSize);
+
+      type Slot = {
+        isRow: boolean;
+        index: number;
+        offset: number;
+        size: number;
+        ships: number; // ships already in slot
+      };
+
+      let availableSlots: Slot[] = [];
+
+      for (const isRow of [true, false]) {
+        for (let i = 0; i < puzzleSize; i++) {
+          let offset = -1;
+          let ships = 0;
+
+          type LocalSlot = Pick<Slot, "offset" | "size" | "ships">;
+          const slots: LocalSlot[] = [];
+
+          // get the available slots
+          for (let j = 0; j < puzzleSize; j++) {
+            const square = isRow ? getSquare(j, i) : getSquare(i, j);
+            const type = getSquareType(square);
+            if (type === "water") {
+              if (offset !== -1) {
+                slots.push({ offset, size: j - offset, ships });
+              }
+              offset = -1;
+              ships = 0;
+            } else {
+              if (offset === -1) offset = j;
+              if (type === "ship") ships++;
+            }
+          }
+          if (offset !== -1) {
+            slots.push({ offset, size: puzzleSize - offset, ships });
+          }
+
+          for (const { offset, size, ships } of slots) {
+            if (size >= shipSize) {
+              availableSlots.push({ isRow, index: i, offset, size, ships });
+            }
+          }
+        }
+      }
+
+      // remove "slots" that are already entirely filled
+      availableSlots = availableSlots.filter((it) => it.size > it.ships);
+
+      availableSlots = availableSlots.filter((it, i) => {
+        const maxShips = getShipsInLine(it.isRow, it.index);
+
+        let existingShips = 0;
+        for (let j = 0; j < puzzleSize; j++) {
+          // skip squares inside the slot
+          if (j >= it.offset && j < it.offset + it.size) continue;
+          const square = it.isRow
+            ? getSquare(j, it.index)
+            : getSquare(it.index, j);
+          if (getSquareType(square) === "ship") existingShips++;
+        }
+
+        return maxShips - existingShips >= shipSize;
+      });
+
+      if (availableSlots.length === count) {
+        for (const it of availableSlots) {
+          // FIXME: there's a bug here, if the slot already has ships in it
+
+          // fill in the middle of the slot
+          for (let j = it.size - shipSize; j < shipSize; j++) {
+            const x = j + it.offset;
+            const y = it.index;
+            markShip(it.isRow ? getSquare(x, y) : getSquare(y, x));
           }
         }
       }
@@ -230,6 +331,9 @@
     document.addEventListener("click", () => setTimeout(solve, 0));
     document.addEventListener("contextmenu", () => setTimeout(solve, 0));
   }
+
+  // injectSolveButton();
+  // injectAutoSolve();
 
   (window as any).injectAutoSolve = injectAutoSolve;
   (window as any).injectSolveButton = injectSolveButton;

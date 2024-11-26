@@ -1,0 +1,14 @@
+{
+  "name": "battleship-solver",
+  "module": "solve.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bun build ./solve.ts --outfile=solve.js --target=browser"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

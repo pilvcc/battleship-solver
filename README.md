@@ -2,11 +2,11 @@
 
 I'm a big fan of [Battleship Solitaire](https://lukerissacher.com/battleships).
 
-![](screenshot.png)
+<kbd><img src='screenshot.png' width="500"></kbd>
 
-The game is simple. You have to figure out where the battleships are. The
-numbers on the sides tell you how many squares in each column/row are part of a
-ship. Ships can't touch, not even diagonally.
+The game is simple. You figure out where the battleships are. The numbers on the
+edges tell you how many squares in each line are part of a ship. Ships can't
+touch, not even diagonally.
 
 The game reveals a few squares to get you going. Every puzzle has a unique
 solution that can be arrived at logically from from the starting position.
@@ -19,15 +19,11 @@ Install Bun, then run:
 bun run build
 ```
 
-(It has to be Bun, not another package manager; the script itself uses Bun.)
+This produces solve.js; paste that into your Chrome console. Then run one of the
+install functions:
 
-This outputs the compiled code into solve.js. Paste that into your console.
-There are two functions you can run:
-
-- `installSolveButtion()` installs a Solve button in the toolbar that solves as
-  far as it can on the current board.
-
-- `installAutoSolve()` installs auto-solve, which solves on every click.
+- `installSolveButton()` installs a Solve button in the toolbar
+- `installAutoSolve()` installs auto-solve, which solves on every click
 
 ## The Solver
 
@@ -47,15 +43,15 @@ For hard puzzles, applying the rules isn't enough. You end up getting stuck.
 Then you have to play the "macro" game of enumerating the possible ship
 configurations, exploring each possible path, and backtracking if it deadends.
 Within each path exploration you play the "micro" game of repeatedly applying
-the simple Wrules and seeing if it leads to an invalid result.
+the simple rules and seeing if it leads to an invalid result.
 
-Right now you spend an inordinate amount of time on the tedious but not
-particularly difficult or interesting micro game. This tool automates the micro
-so you can focus solely on the macro.
+Right now you spend a bunch of time on the tedious but not particularly
+challenging/interesting micro game. This automates the micro so you can focus on
+the macro.
 
 In a way I was inspired by Braid, a platformer that lets you rewind time instead
-of dying, so that the game becomes more about the higher-level puzzle rather
-than trying not to fall or get killed.
+of dying, so that the game becomes about the higher-level puzzle rather than
+mechanically trying not to fall or get killed.
 
 ## Future work
 

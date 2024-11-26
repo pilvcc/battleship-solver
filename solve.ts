@@ -1,18 +1,8 @@
 (() => {
-  function getPuzzleSize() {
-    const puzzle = document.querySelector("table.puzzle");
-    return parseInt(puzzle?.getAttribute("data-size") ?? "0", 10);
-  }
+  const byId = (id: string) => document.getElementById(id);
 
-  function getShipsInRow(row: number) {
-    const th = document.getElementById(`Row${row}`);
-    return parseInt(th!.textContent!, 10);
-  }
-
-  function getShipsInColumn(col: number) {
-    const th = document.getElementById(`Col${col}`);
-    return parseInt(th!.textContent!, 10);
-  }
+  const getShipsInLine = (isRow: boolean, index: number) =>
+    parseInt(byId(`${isRow ? "Row" : "Col"}${index}`)!.textContent!, 10);
 
   let tappedSinceLastCheck = false;
 
@@ -27,11 +17,21 @@
     tappedSinceLastCheck = true;
   }
 
-  const getSquare = (x: number, y: number) =>
-    document.getElementById(`Cell${x}_${y}`);
+  const getSquare = (x: number, y: number) => byId(`Cell${x}_${y}`);
 
-  // square types: water blank sub cap-left cap-right cap-top cap-bottom middle
-  const getSquareClasses = (el: Element) => new Set(Array.from(el.classList));
+  type SquareClass =
+    | "revealed"
+    | "water"
+    | "blank"
+    | "sub"
+    | "cap-left"
+    | "cap-right"
+    | "cap-top"
+    | "cap-bottom"
+    | "middle";
+
+  const getSquareClasses = (el: Element) =>
+    new Set(Array.from(el.classList)) as Set<SquareClass>;
 
   type SquareType = "blank" | "water" | "ship" | "invalid";
 
@@ -39,12 +39,10 @@
     if (!el) return "invalid";
 
     const classes = getSquareClasses(el);
-    if (classes.has("blank")) {
-      return "blank";
-    }
-    if (classes.has("water")) {
-      return "water";
-    }
+
+    if (classes.has("blank")) return "blank";
+    if (classes.has("water")) return "water";
+
     return "ship";
   }
 
@@ -66,14 +64,7 @@
   }
 
   const markWater = (square: Element | null) => markSquare(square, "water");
-
   const markShip = (square: Element | null) => markSquare(square, "ship");
-
-  function isShip(x: number, y: number) {
-    const square = getSquare(x, y);
-    if (!square) return false;
-    return getSquareType(square) === "ship";
-  }
 
   function solveOnce() {
     // click the autosolve headers
@@ -84,122 +75,103 @@
       });
     }
 
-    const puzzleSize = getPuzzleSize();
+    const puzzle = document.querySelector("table.puzzle");
+    const puzzleSize = parseInt(puzzle!.getAttribute("data-size")!, 10);
 
     function iterSquares() {
-      const ret: [number, number, Element][] = [];
+      const coords: [number, number][] = [];
       for (let x = 0; x < puzzleSize; x++) {
         for (let y = 0; y < puzzleSize; y++) {
-          ret.push([x, y, getSquare(x, y)!]);
+          coords.push([x, y]);
         }
       }
-      return ret;
+
+      return coords.map(([x, y]) => {
+        const classes = getSquareClasses(getSquare(x, y)!);
+        return [x, y, classes] as const;
+      });
     }
 
     // extrapolate revealed ship squares
-    for (const [x, y, square] of iterSquares()) {
-      const classes = getSquareClasses(square);
+    for (const [x, y, classes] of iterSquares()) {
       if (!classes.has("revealed")) continue;
 
+      const mark = (x: number, y: number) => markShip(getSquare(x, y));
+
       // extend ship caps
-      if (classes.has("cap-left")) markShip(getSquare(x + 1, y));
-      if (classes.has("cap-right")) markShip(getSquare(x - 1, y));
-      if (classes.has("cap-top")) markShip(getSquare(x, y + 1));
-      if (classes.has("cap-bottom")) markShip(getSquare(x, y - 1));
+      if (classes.has("cap-left")) mark(x + 1, y);
+      if (classes.has("cap-right")) mark(x - 1, y);
+      if (classes.has("cap-top")) mark(x, y + 1);
+      if (classes.has("cap-bottom")) mark(x, y - 1);
 
       // handle ship middles
       // if one way is blocked (by water, by max ship count), fill in the ship the other way
       if (classes.has("middle")) {
-        // true = check if blocked columnwise, false = check rowwise
-        for (const transp of [true, false]) {
-          const getNeighbor = (dx: number, dy: number) => {
-            return transp
-              ? getSquare(x + dy, y + dx)
-              : getSquare(x + dx, y + dy);
-          };
+        const isBlocked = (x: number, y: number) =>
+          ["ship", "invalid"].includes(getSquareType(getSquare(x, y)));
 
-          const isBlocked = () => {
-            for (const dx of [-1, 1]) {
-              const neighbor = getNeighbor(dx, 0);
-              if (!neighbor) return true;
-              if (getSquareType(neighbor) === "water") return true;
-            }
+        const areSidesBlocked = (isRow: boolean) => {
+          if (isRow) {
+            if (isBlocked(x - 1, y)) return true;
+            if (isBlocked(x + 1, y)) return true;
+          } else {
+            if (isBlocked(x, y - 1)) return true;
+            if (isBlocked(x, y + 1)) return true;
+          }
+          return getShipsInLine(isRow, isRow ? y : x) < 3;
+        };
 
-            const ships = transp ? getShipsInColumn(x) : getShipsInRow(y);
-            if (ships < 3) return true;
-
-            return false;
-          };
-
-          if (!isBlocked()) continue;
-
-          markShip(getNeighbor(0, -1));
-          markShip(getNeighbor(0, +1));
+        if (areSidesBlocked(true)) {
+          mark(x, y + 1);
+          mark(x, y - 1);
+        } else if (areSidesBlocked(false)) {
+          mark(x - 1, y);
+          mark(x + 1, y);
         }
       }
     }
 
     // mark the water around ships
-    for (const [x, y, square] of iterSquares()) {
-      const classes = getSquareClasses(square);
-
+    for (const [x, y, classes] of iterSquares()) {
       if (classes.has("water") || classes.has("blank")) continue;
 
-      const _markWater = (x, y) => {
-        const square = getSquare(x, y);
-        if (square) markWater(square);
-      };
+      const mark = (x: number, y: number) => markWater(getSquare(x, y));
 
-      _markWater(x - 1, y + 1);
-      _markWater(x + 1, y + 1);
-      _markWater(x - 1, y - 1);
-      _markWater(x + 1, y - 1);
+      mark(x - 1, y + 1);
+      mark(x + 1, y + 1);
+      mark(x - 1, y - 1);
+      mark(x + 1, y - 1);
 
-      if (classes.has("cap-left")) {
-        _markWater(x - 1, y);
-        _markWater(x, y - 1);
-        _markWater(x, y + 1);
-      }
-      if (classes.has("cap-right")) {
-        _markWater(x + 1, y);
-        _markWater(x, y - 1);
-        _markWater(x, y + 1);
-      }
-      if (classes.has("cap-top")) {
-        _markWater(x, y - 1);
-        _markWater(x - 1, y);
-        _markWater(x + 1, y);
-      }
-      if (classes.has("cap-bottom")) {
-        _markWater(x, y + 1);
-        _markWater(x - 1, y);
-        _markWater(x + 1, y);
-      }
-      if (classes.has("sub")) {
-        _markWater(x, y - 1);
-        _markWater(x - 1, y);
-        _markWater(x + 1, y);
-        _markWater(x, y + 1);
-      }
-      if (classes.has("middle") || classes.has("unknown")) {
-        if (isShip(x - 1, y) || isShip(x + 1, y)) {
-          _markWater(x, y + 1);
-          _markWater(x, y - 1);
-        }
-        if (isShip(x, y - 1) || isShip(x, y + 1)) {
-          _markWater(x - 1, y);
-          _markWater(x + 1, y);
-        }
+      if (classes.has("middle") || classes.has("unknown")) continue;
+
+      // caps and subs
+
+      let skip = [x, y];
+      if (classes.has("cap-left")) skip = [x + 1, y];
+      if (classes.has("cap-right")) skip = [x - 1, y];
+      if (classes.has("cap-top")) skip = [x, y + 1];
+      if (classes.has("cap-bottom")) skip = [x, y - 1];
+
+      const waters = [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1],
+      ];
+
+      for (const [x2, y2] of waters) {
+        if (skip[0] === x2 && skip[1] !== y2) continue;
+        mark(x2, y2);
       }
     }
 
     // mark rows/cols where all remaining spots must be ships
-    for (const transp of [true, false]) {
+    for (const isRow of [true, false]) {
       for (let x = 0; x < puzzleSize; x++) {
-        const ships = transp ? getShipsInRow(x) : getShipsInColumn(x);
+        const ships = getShipsInLine(isRow, x);
 
-        const getRealSquare = (x, y) => {
-          return transp ? getSquare(y, x) : getSquare(x, y);
+        const getRealSquare = (x: number, y: number) => {
+          return isRow ? getSquare(y, x) : getSquare(x, y);
         };
 
         const squares: [number, SquareType][] = [];
@@ -226,45 +198,27 @@
   }
 
   async function solve() {
-    let solves = 0;
     while (true) {
       tappedSinceLastCheck = false;
       solveOnce();
       if (!tappedSinceLastCheck) break;
-      solves++;
 
       // wait until the next frame
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
-
-    if (solves > 0) {
-      console.log(`performed ${solves} solve steps`);
-    }
   }
 
   function injectSolveButton() {
-    const existingButton = document.getElementById("BtnSolve");
-    if (existingButton) {
-      existingButton.remove();
-    }
+    const existingButton = byId("BtnSolve");
+    if (existingButton) existingButton.remove();
 
-    const resetButton = document.getElementById("BtnReset");
-    if (!resetButton) {
-      console.error("unable to insert button");
-      return;
-    }
-
+    const resetButton = byId("BtnReset")!;
     resetButton.insertAdjacentHTML(
       "afterend",
       '<input type="button" value="Solve" id="BtnSolve">'
     );
 
     const solveButton = resetButton.nextElementSibling as HTMLInputElement;
-    if (!solveButton) {
-      console.error("unable to insert button");
-      return;
-    }
-
     solveButton.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();

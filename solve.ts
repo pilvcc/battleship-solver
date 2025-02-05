@@ -349,7 +349,7 @@ import { counting } from "radash";
     }
   }
 
-  function injectSolveButton() {
+  function installSolveButton() {
     const existingButton = byId("BtnSolve");
     if (existingButton) existingButton.remove();
 
@@ -367,11 +367,11 @@ import { counting } from "radash";
     };
   }
 
-  function injectAutoSolve() {
+  function installSolve() {
     document.addEventListener("click", () => setTimeout(solve, 0));
     document.addEventListener("contextmenu", () => setTimeout(solve, 0));
   }
 
-  (window as any).injectAutoSolve = injectAutoSolve;
-  (window as any).injectSolveButton = injectSolveButton;
+  (window as any).installSolve = installSolve;
+  (window as any).installSolveButton = installSolveButton;
 })();
